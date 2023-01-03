@@ -1,0 +1,41 @@
+[package]
+name = "rust-esp32-osc-led"
+version = "0.1.0"
+authors = ["Hideaki Tai <hideaki.tai@gmail.com>"]
+edition = "2021"
+resolver = "2"
+
+[profile.release]
+opt-level = "s"
+
+[profile.dev]
+debug = true # Symbols are nice and they don't increase the size on Flash
+opt-level = "z"
+
+[features]
+pio = ["esp-idf-sys/pio"]
+
+[dependencies]
+anyhow = {version = "1", features = ["backtrace"]}
+log = "0.4"
+esp-idf-sys = { version = "0.32", features = ["binstart"] }
+esp-idf-svc = "0.45"
+esp-idf-hal = "0.40"
+embedded-svc = "0.24"
+embedded-hal = "0.2"
+rosc = "0.9"
+smart-leds = "*"
+ws2812-esp32-rmt-driver = "*"
+bbqueue = "0.5"
+heapless = "0.7"
+thingbuf = { version = "0.1", features = ["static"] }
+
+[build-dependencies]
+embuild = { version = "0.31", features = ["elf"] }
+anyhow = "1"
+
+[[example]]
+name = "led"
+
+[[example]]
+name = "osc_ping_pong"
