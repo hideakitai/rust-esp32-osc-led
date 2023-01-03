@@ -36,7 +36,7 @@ oscd
 Following OSC commands are available
 
 ```bash
-/ping       # reply /pong 1 to your_ip:54321 from your device
+/ping       # reply /pong 1 to your_ip:OSC_WIFI_PONG_PORT from your device
 /rgb r g b  # set color to LED (int 0-255 are available for r, g, b)
 ```
 
