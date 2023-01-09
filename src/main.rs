@@ -5,7 +5,7 @@ use esp_idf_sys;
 use log::*;
 use smart_leds::RGB8;
 use std::env;
-use thingbuf::mpsc::StaticChannel;
+use heapless::spsc::Queue;
 
 mod led;
 mod osc;
@@ -20,8 +20,8 @@ const OSC_WIFI_PASS: &str = env!("OSC_WIFI_PASS");
 const OSC_WIFI_RECV_PORT_STR: &str = env!("OSC_WIFI_RECV_PORT");
 const OSC_WIFI_PONG_PORT_STR: &str = env!("OSC_WIFI_PONG_PORT");
 
-// LED_CHANNEL should be 'static to pass to threads
-static LED_CHANNEL: StaticChannel<RGB8, 16> = StaticChannel::new();
+// QUEUE should be 'static to pass to threads
+static mut QUEUE: Option<Queue<RGB8, 16>> = None;
 
 fn main() -> Result<()> {
     // Initialize nvs
@@ -42,14 +42,15 @@ fn main() -> Result<()> {
         OSC_WIFI_PASS,
     )?;
 
-    // Create StaticChannel to send RGB data from OSC thread to LED thread
-    let (sender, receiver) = LED_CHANNEL.split();
+    // Create Queue to send RGB data from OSC thread to LED thread
+    unsafe { QUEUE = Some(Queue::new()); }
+    let (producer, consumer) = unsafe { QUEUE.as_mut().unwrap().split() };
 
     // Create thread to handle LEDs
     let led_join_handle = std::thread::Builder::new()
         .stack_size(4096)
         .spawn(move || {
-            let mut led = Led::new(receiver);
+            let mut led = Led::new(consumer);
             loop {
                 if let Err(e) = led.run() {
                     error!("Failed to run LEDs: {e}");
@@ -67,7 +68,7 @@ fn main() -> Result<()> {
     let osc_join_handle = std::thread::Builder::new()
         .stack_size(8192)
         .spawn(move || {
-            let mut osc = Osc::new(ip, recv_port, pong_port, sender);
+            let mut osc = Osc::new(ip, recv_port, pong_port, producer);
             loop {
                 if let Err(e) = osc.run() {
                     error!("Failed to run OSC: {e}");

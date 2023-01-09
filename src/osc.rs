@@ -3,21 +3,21 @@ use log::*;
 use rosc::{self, OscMessage, OscPacket, OscType};
 use smart_leds::RGB8;
 use std::net::{SocketAddrV4, UdpSocket};
-use thingbuf::mpsc::StaticSender;
+use heapless::spsc::Producer;
 
-pub struct Osc {
+pub struct Osc <'a> {
     sock: UdpSocket,
     buf: [u8; rosc::decoder::MTU],
     pong_port: u16,
-    sender: StaticSender<RGB8>,
+    producer: Producer<'a, RGB8, 16>,
 }
 
-impl Osc {
+impl<'a> Osc<'a> {
     pub fn new(
         ip: embedded_svc::ipv4::Ipv4Addr,
         recv_port: u16,
         pong_port: u16,
-        sender: StaticSender<RGB8>,
+        producer: Producer<'a, RGB8, 16>,
     ) -> Self {
         let recv_addr = SocketAddrV4::new(ip, recv_port);
         let sock = UdpSocket::bind(recv_addr).unwrap();
@@ -28,7 +28,7 @@ impl Osc {
             sock,
             buf,
             pong_port,
-            sender,
+            producer
         }
     }
 
@@ -43,7 +43,7 @@ impl Osc {
                         info!("OSC arguments: {:?}", msg.args);
 
                         match msg.addr.as_str() {
-                            // reply /pong 1 to sender (port will be changed to OSC_DEST_PORT)
+                            // reply /pong 1 to producer (port will be changed to OSC_DEST_PORT)
                             "/ping" => {
                                 let msg_buf =
                                     rosc::encoder::encode(&OscPacket::Message(OscMessage {
@@ -63,7 +63,9 @@ impl Osc {
                                 for arg in msg.args {
                                     rgb.push(arg.int().unwrap() as u8);
                                 }
-                                self.sender.try_send(RGB8::from_iter(rgb))?;
+                                if let Err(rgb) = self.producer.enqueue(RGB8::from_iter(rgb)) {
+                                    bail!("Error enqueue rgb value {rgb}");
+                                }
                             }
                             _ => {}
                         }
